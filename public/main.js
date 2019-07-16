@@ -33,6 +33,11 @@ async function initAuth() {
     }
     const provider = new firebase.auth.GoogleAuthProvider();
     auth.signInWithRedirect(provider);
+
+    await db.collection('users').doc(user.uid).set({
+      name: user.displayNmae,
+      photoURL: user.photoURL
+    })
   })
 
   try {
