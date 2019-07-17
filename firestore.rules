@@ -1,6 +1,7 @@
 rules_version = '2';
 
 function isProfile(resource) {
+  // resource変数 => 保存されたデータを参照
   // name・photoURL以外のフィールドがあった場合エラー
   return resource.keys().hasOnly(['name', 'photoURL']) &&
     // nameは文字列かつ50文字以内のみ可
@@ -10,14 +11,34 @@ function isProfile(resource) {
     (!('photoURL' in resource.keys()) || (resource.photoURL is string && resource.photoURL.matches("^https:[/][/].*")));
 }
 
+function isPost(resource) {
+  return resource.keys().hasOnly(['uid', 'text', 'created']) &&
+    resource.keys().hasAll(['uid', 'created']) && // uidとcreatedは必須にする
+    resource.uid is string &&
+    (!('text' in resource.keys()) ||
+      (resource.text is string &&
+        resource.text.size() <= 140)) &&
+    resource.created is timestamp;
+}
+
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
       // getのみにし、ユーザー一覧を取れないよう制限
       allow get: if request.auth.uid != null
-      allow write: if isProfie(request.resource.data) &&
+      // request.resource.data => リクエストのデータが格納
+      allow write: if isProfile(request.resource.data) &&
         // ユーザー本人のみ書き換え可能
         request.auth.uid == userId;
+
+      match /timeline/{postId} {
+        allow read: if request.auth.uid == userId || userId == resource.data.uid;
+        allow create: if isPost(request.resource.data) &&
+          request.auth.uid == request.resource.data.uid &&
+          request.time == request.resource.data.created &&
+          request.auth.uid == userId;
+        allow delete: if request.auth.uid == userId;
+      }
     }
   }
 }
